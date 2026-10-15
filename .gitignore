@@ -1,0 +1,8 @@
+# Environment and dependencies
+.venv/
+node_modules/
+.env
+
+# Python caching
+**/__pycache__/
+*.py[cod]
