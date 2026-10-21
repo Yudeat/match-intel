@@ -29,7 +29,7 @@ def top3(state: MatchState) -> list[dict]:
 async def stream(n: int = 300, delay: float = 0.3, agents: bool = True):
     use_agents = agents and foundry_configured()
     if use_agents:
-        from .agents.analyst import analyze
+        from .agents.pipeline import run_pipeline
 
     async def gen():
         state = MatchState()
@@ -40,7 +40,7 @@ async def stream(n: int = 300, delay: float = 0.3, agents: bool = True):
         async def analyze_task(ev, board):
             async with sem:
                 try:
-                    result = await analyze(ev, board)
+                    result = await run_pipeline(ev, board)
                 except Exception as exc:  # never let an agent failure kill the stream
                     print(f"analyst failed: {exc}")
                     return
@@ -48,7 +48,7 @@ async def stream(n: int = 300, delay: float = 0.3, agents: bool = True):
                 "timestamp": ev.timestamp,
                 "player": ev.player.model_dump(),
                 "metrics": ev.metrics.model_dump(),
-                "analysis": result,
+                **result,
             })})
 
         async def producer():
