@@ -1,4 +1,5 @@
 "use client";
+
 import { MotionConfig } from "framer-motion";
 import { useState } from "react";
 import Leaderboard from "../components/Leaderboard";
@@ -31,7 +32,9 @@ export default function Home() {
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-5xl leading-none tabular-nums" style={DISPLAY}>{last ? `${last.timestamp}` : "00:00"}</span>
+            <span className="text-5xl leading-none tabular-nums" style={DISPLAY}>
+              {last ? last.timestamp : "00:00"}
+            </span>
             <span className="rounded-sm px-2 py-1 text-xs font-semibold"
               style={{ background: status === "live" ? GAIN : "#cfd5dd", color: status === "live" ? "white" : INK }}>
               {status === "live" ? "Live" : status === "ended" ? "Finished" : "Connecting"}
@@ -85,12 +88,12 @@ export default function Home() {
                       style={{ borderColor: FLARE }}>
                       <div className="mb-1 flex justify-between text-xs" style={{ color: MUTED }}>
                         <span>{ins.timestamp} {ins.player.name}</span>
-<span>{BADGE[ins.validation ?? ""] ?? ins.validation ?? "Analyst only"}</span>
+                        <span>{BADGE[ins.validation ?? ""] ?? ins.validation ?? "Analyst only"}</span>
                       </div>
-                     <p>{ins.narratives?.[mode]?.text ?? ins.analysis?.finding}</p>
-{mode === "studio" && ins.analysis?.why && (
-  <p className="mt-1" style={{ color: MUTED }}>{ins.analysis.why}</p>
-)}
+                      <p>{ins.narratives?.[mode]?.text ?? ins.analysis?.finding}</p>
+                      {mode === "studio" && ins.analysis?.why && (
+                        <p className="mt-1" style={{ color: MUTED }}>{ins.analysis.why}</p>
+                      )}
                     </li>
                   ))}
                 </ul>
