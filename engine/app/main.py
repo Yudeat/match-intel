@@ -7,8 +7,9 @@ from sse_starlette.sse import EventSourceResponse
 
 from .agents.foundry import foundry_configured
 from .agents.gate import should_analyze
-from .impact import MatchState, enrich
+from .impact import enrich
 from .simulator import generate_match
+from .redis_client import redis_client
 
 app = FastAPI(title="Match Intelligence Engine")
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:3000"],
@@ -20,9 +21,11 @@ def health():
     return {"status": "ok", "agents": foundry_configured()}
 
 
-def top3(state: MatchState) -> list[dict]:
-    best = sorted(state.scores.items(), key=lambda kv: kv[1], reverse=True)[:3]
-    return [{"player_id": p, "match_score": round(s, 3)} for p, s in best]
+def top3(match_id: str) -> list[dict]:
+    board_key = f"match:{match_id}:leaderboard"
+    # Fetch top 3 players from Redis Sorted Set
+    top_players = redis_client.zrevrange(board_key, 0, 2, withscores=True)
+    return [{"player_id": pid, "match_score": round(score, 3)} for pid, score in top_players]
 
 
 @app.get("/stream")
@@ -32,7 +35,6 @@ async def stream(n: int = 300, delay: float = 0.3, agents: bool = True):
         from .agents.pipeline import run_pipeline
 
     async def gen():
-        state = MatchState()
         queue: asyncio.Queue = asyncio.Queue()
         sem = asyncio.Semaphore(3)  # limit concurrent model calls
         tasks: list[asyncio.Task] = []
@@ -52,11 +54,14 @@ async def stream(n: int = 300, delay: float = 0.3, agents: bool = True):
             })})
 
         async def producer():
+            match_id = "default_match"
             for raw in generate_match(n):
-                ev = enrich(raw, state)
+                match_id = raw.match_id
+                # Enriched event handles Redis state persistence automatically
+                ev = enrich(raw)
                 await queue.put({"event": "impact", "data": ev.model_dump_json()})
                 if use_agents and should_analyze(ev):
-                    tasks.append(asyncio.create_task(analyze_task(ev, top3(state))))
+                    tasks.append(asyncio.create_task(analyze_task(ev, top3(match_id))))
                 await asyncio.sleep(delay)
             await asyncio.gather(*tasks)
             await queue.put(None)

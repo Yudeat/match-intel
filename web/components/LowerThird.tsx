@@ -24,7 +24,7 @@ export default function LowerThird({ insight }: LowerThirdProps) {
       >
         <div className="mb-1 flex items-center justify-between text-xs font-semibold uppercase tracking-wider">
           <span>{insight.timestamp} — {insight.player.name}</span>
-          <span>{insight.analysis?.headline || "Key Impact"}</span>
+          <span>{insight.analysis?.finding || "Key Impact"}</span>
         </div>
         <p className="text-base font-medium leading-tight" style={DISPLAY}>
           {insight.narratives?.studio?.text || insight.analysis?.finding}

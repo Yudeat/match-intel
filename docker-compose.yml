@@ -1,0 +1,16 @@
+services:
+  engine:
+    build: ./engine
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=rediss://default:${REDIS_PASSWORD}@intel.eastus.redis.azure.net:10000/0
+
+  web:
+    build: ./web
+    ports:
+      - "3001:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - engine

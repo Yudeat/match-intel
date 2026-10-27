@@ -3,6 +3,7 @@ import numpy as np
 
 from . import config as C
 from .schemas import (Cumulative, EnrichedEvent, Location, Metrics, RawEvent)
+from .redis_client import redis_client
 
 
 def _build_grid() -> np.ndarray:
@@ -54,26 +55,29 @@ def significance(score: float) -> str:
     return "MEDIUM" if s >= C.MEDIUM_THRESHOLD else "LOW"
 
 
-class MatchState:
-    """In-memory cumulative scores. Swap for Redis later."""
+class RedisMatchState:
+    """Persistent cumulative scores using Azure Managed Redis."""
 
-    def __init__(self):
-        self.scores: dict[str, float] = {}
+    def __init__(self, match_id: str):
+        self.match_id = match_id
+        self.board_key = f"match:{match_id}:leaderboard"
 
     def add(self, player_id: str, score: float) -> tuple[float, int]:
-        self.scores[player_id] = self.scores.get(player_id, 0.0) + score
-        total = self.scores[player_id]
-        rank = 1 + sum(1 for v in self.scores.values() if v > total)
-        return total, rank
+        # Atomically increment score in a Redis Sorted Set
+        new_total = redis_client.zincrby(self.board_key, score, player_id)
+        
+        # Calculate rank dynamically from sorted set position (0-indexed to 1-based)
+        rank = redis_client.zrevrank(self.board_key, player_id) + 1
+        
+        return float(new_total), int(rank)
 
 
-def enrich(raw: RawEvent, state: MatchState) -> EnrichedEvent:
+def enrich(raw: RawEvent, state=None) -> EnrichedEvent:
     press = pressure(raw.start, raw.opponents)
     lines = 0
     difficulty = 0.0
 
     if raw.event_type in ("tackle", "interception"):
-        # Defensive value: threat the opponent would have had at this spot
         delta = xt_at(C.PITCH_L - raw.start[0], C.PITCH_W - raw.start[1]) if raw.success else 0.0
     elif raw.success:
         delta = xt_at(*raw.end) - xt_at(*raw.start)
@@ -86,7 +90,10 @@ def enrich(raw: RawEvent, state: MatchState) -> EnrichedEvent:
         difficulty = min(1.0, 0.5 * press + 0.5 * min(dist / 40, 1.0))
 
     score = impact_score(delta, press, lines)
-    total, rank = state.add(raw.player.id, score)
+    
+    # Use Redis-backed match state per match ID
+    match_state = RedisMatchState(raw.match_id)
+    total, rank = match_state.add(raw.player.id, score)
 
     return EnrichedEvent(
         match_id=raw.match_id,
