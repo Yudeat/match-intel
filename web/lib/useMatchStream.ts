@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Board, ImpactEvent, Insight } from "./types";
 
-export const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+export const API = process.env.NEXT_PUBLIC_API_URL;
 
 export function useMatchStream(delay = 0.3) {
   const [events, setEvents] = useState<ImpactEvent[]>([]);

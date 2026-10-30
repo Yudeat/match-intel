@@ -31,9 +31,26 @@ cited_metrics must copy values exactly from the input.Describe where the action 
 
 
 def _parse(text: str) -> dict:
-    text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
-    return json.loads(text)
-
+    if not text or not text.strip():
+        return {
+            "finding": "Analysis unavailable",
+            "why": "Empty response received from model.",
+            "key_factors": [],
+            "cited_metrics": {"impact_score": 0.0, "delta_xT": 0.0, "pressure": 0.0, "lines_broken": 0},
+            "confidence": "LOW"
+        }
+    
+    cleaned = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        return {
+            "finding": cleaned[:100],
+            "why": "Model output failed strict JSON parsing.",
+            "key_factors": [],
+            "cited_metrics": {"impact_score": 0.0, "delta_xT": 0.0, "pressure": 0.0, "lines_broken": 0},
+            "confidence": "LOW"
+        }
 
 async def analyze(event: EnrichedEvent, leaderboard: list[dict]) -> dict:
     ensure_agent(AGENT_NAME, os.environ["FOUNDRY_ANALYST_MODEL"], INSTRUCTIONS)
@@ -42,7 +59,7 @@ async def analyze(event: EnrichedEvent, leaderboard: list[dict]) -> dict:
         "zone": zone(*event.location.start),
         "leaderboard_top3": leaderboard,
     })
-    text = await asyncio.to_thread(run_agent, AGENT_NAME, payload)
+    text = await asyncio.to_thread(run_agent, AGENT_NAME, payload, system_instruction=INSTRUCTIONS)
     return _parse(text)
 
 def zone(x: float, y: float) -> str:
